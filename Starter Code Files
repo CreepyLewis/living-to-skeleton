@@ -1,0 +1,18 @@
+import cv2
+import mediapipe as mp
+
+mp_pose = mp.solutions.pose
+pose = mp_pose.Pose(static_image_mode=True)
+
+image = cv2.imread("data/images/input.jpg")
+image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+results = pose.process(image_rgb)
+
+if results.pose_landmarks:
+    mp.solutions.drawing_utils.draw_landmarks(
+        image,
+        results.pose_landmarks,
+        mp_pose.POSE_CONNECTIONS
+    )
+
+cv2.imwrite("outputs/images/skeleton.jpg", image)
