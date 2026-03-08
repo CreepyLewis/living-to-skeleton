@@ -17,4 +17,3 @@ if results.pose_landmarks:
 
 
 cv2.imwrite("outputs/images/skeleton.jpg", image)
-
