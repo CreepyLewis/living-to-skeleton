@@ -15,4 +15,5 @@ if results.pose_landmarks:
         mp_pose.POSE_CONNECTIONS
     )
 
+
 cv2.imwrite("outputs/images/skeleton.jpg", image)
