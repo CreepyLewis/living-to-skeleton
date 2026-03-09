@@ -8,6 +8,5 @@ cd living-to-skeleton-ai
 pip install -r requirements.txt
 
 
-
 # 🎮 Run the application
 python main.py
