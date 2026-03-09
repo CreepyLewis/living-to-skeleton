@@ -1,6 +1,7 @@
 # 📥 Clone repository
 git clone https://github.com/CreepyLewis/living-to-skeleton-ai.git
 
+
 # 📁 Navigate to project
 cd living-to-skeleton-ai
 
