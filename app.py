@@ -2,6 +2,7 @@ import streamlit as st
 import cv2
 import numpy as np
 from PIL import Image
+from pathlib import Path
 
 # ------------------------
 # Page Configuration
@@ -12,9 +13,9 @@ st.title("🦴 Living to Skeleton AI")
 st.write("Upload an image to see its skeletonized version. Adjust the threshold for best results!")
 
 # ------------------------
-# File uploader
+# File uploader (drag-and-drop)
 # ------------------------
-uploaded_file = st.file_uploader("Upload Image", type=["png","jpg","jpeg"])
+uploaded_file = st.file_uploader("Upload Image", type=["png", "jpg", "jpeg"])
 
 # ------------------------
 # Threshold slider
@@ -33,13 +34,13 @@ def skeletonize(image_array, thresh_val):
     skeleton = cv2.ximgproc.thinning(binary)
     # Invert back to normal colors
     skeleton = cv2.bitwise_not(skeleton)
-    # Optional: colorize skeleton (red)
+    # Colorize skeleton (red)
     colored = cv2.cvtColor(skeleton, cv2.COLOR_GRAY2RGB)
     colored[np.where((colored==[255,255,255]).all(axis=2))] = [255,0,0]  # red skeleton
     return colored
 
 # ------------------------
-# Main logic
+# Main app logic
 # ------------------------
 if uploaded_file:
     image = Image.open(uploaded_file).convert("RGB")
@@ -65,5 +66,8 @@ if uploaded_file:
     )
 
 else:
-    # Use static PNG demo preview instead of GIF
-    st.image("assets/demo.png", caption="Demo Preview")
+    # Cloud-safe demo image
+    demo_path = Path(__file__).parent / "assets" / "demo.png"
+    with open(demo_path, "rb") as f:
+        demo_bytes = f.read()
+    st.image(demo_bytes, caption="Demo Preview")
