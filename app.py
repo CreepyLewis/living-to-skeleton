@@ -2,11 +2,13 @@ import streamlit as st
 import cv2
 import numpy as np
 from PIL import Image
-from streamlit_drawable_canvas import st_canvas
+import mediapipe as mp
+from ultralytics import YOLO
 
-# -----------------------
-# Page config
-# -----------------------
+# ------------------------
+# PAGE CONFIG
+# ------------------------
+
 st.set_page_config(
     page_title="Living to Skeleton AI",
     page_icon="🦴",
@@ -14,64 +16,96 @@ st.set_page_config(
 )
 
 st.title("🦴 Living to Skeleton AI")
-st.write("Upload an image, draw something, or take a photo to convert it into a skeleton!")
+st.write("Upload an image and living things turn into skeletons!")
 
-# -----------------------
-# Skeletonization function
-# -----------------------
-def skeletonize(img):
-    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+# ------------------------
+# LOAD MODELS
+# ------------------------
 
-    _, binary = cv2.threshold(gray, 127, 255, cv2.THRESH_BINARY_INV)
+@st.cache_resource
+def load_models():
+    yolo = YOLO("yolov8n.pt")
+    mp_pose = mp.solutions.pose.Pose()
+    mp_draw = mp.solutions.drawing_utils
+    return yolo, mp_pose, mp_draw
 
-    skel = np.zeros(binary.shape, np.uint8)
-    element = cv2.getStructuringElement(cv2.MORPH_CROSS, (3,3))
+yolo, pose, mp_draw = load_models()
 
-    while True:
-        eroded = cv2.erode(binary, element)
-        temp = cv2.dilate(eroded, element)
-        temp = cv2.subtract(binary, temp)
-        skel = cv2.bitwise_or(skel, temp)
-        binary = eroded.copy()
+# ------------------------
+# HUMAN SKELETON
+# ------------------------
 
-        if cv2.countNonZero(binary) == 0:
-            break
+def draw_skeleton(img):
 
-    return skel
+    rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+    results = pose.process(rgb)
+
+    if results.pose_landmarks:
+        mp_draw.draw_landmarks(
+            img,
+            results.pose_landmarks,
+            mp.solutions.pose.POSE_CONNECTIONS
+        )
+        return img
+
+    return img
 
 
-# -----------------------
-# Upload Image Section
-# -----------------------
+# ------------------------
+# DETECT LIVING THINGS
+# ------------------------
+
+def living_to_skeleton(img):
+
+    results = yolo(img)[0]
+
+    living_classes = ["person", "dog", "cat", "horse", "cow", "sheep"]
+
+    for box in results.boxes:
+
+        cls = int(box.cls[0])
+        label = yolo.names[cls]
+
+        if label in living_classes:
+
+            x1, y1, x2, y2 = map(int, box.xyxy[0])
+
+            roi = img[y1:y2, x1:x2]
+
+            roi = draw_skeleton(roi)
+
+            img[y1:y2, x1:x2] = roi
+
+    return img
+
+
+# ------------------------
+# UPLOAD IMAGE
+# ------------------------
+
 st.header("📤 Upload Image")
 
-uploaded_file = st.file_uploader(
+uploaded = st.file_uploader(
     "Upload Image",
     type=["png","jpg","jpeg"]
 )
 
-if uploaded_file:
-    image = Image.open(uploaded_file).convert("RGB")
+if uploaded:
+
+    image = Image.open(uploaded).convert("RGB")
     img = np.array(image)
 
-    skeleton = skeletonize(img)
+    result = living_to_skeleton(img.copy())
 
     col1, col2 = st.columns(2)
 
     with col1:
-        st.subheader("Original Image")
+        st.subheader("Original")
         st.image(img)
 
     with col2:
-        st.subheader("Skeleton Image")
-        st.image(skeleton)
-
-    st.download_button(
-        "Download Skeleton",
-        data=cv2.imencode(".png", skeleton)[1].tobytes(),
-        file_name="skeleton.png",
-        mime="image/png"
-    )
+        st.subheader("Skeleton Result")
+        st.image(result)
 
 # -----------------------
 # Drawing Canvas Section
