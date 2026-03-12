@@ -1,5 +1,7 @@
 streamlit
-opencv-contrib-python-headless
+opencv-python-headless
 numpy
 pillow
+mediapipe
+ultralytics
 streamlit-drawable-canvas
