@@ -1,7 +1,0 @@
-from PIL import Image
-
-# Open GIF
-im = Image.open("assets/demo.gif")
-
-# Save first frame as PNG
-im.save("assets/demo.png")
