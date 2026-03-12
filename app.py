@@ -2,72 +2,60 @@ import streamlit as st
 import cv2
 import numpy as np
 from PIL import Image
-from pathlib import Path
+from streamlit_drawable_canvas import st_canvas
 
-# ------------------------
-# Page Configuration
-# ------------------------
 st.set_page_config(page_title="Living to Skeleton AI", page_icon="🦴", layout="wide")
 
 st.title("🦴 Living to Skeleton AI")
-st.write("Upload an image to see its skeletonized version. Adjust the threshold for best results!")
+st.write("Upload an image OR draw something and convert it into a skeleton!")
 
-# ------------------------
-# File uploader (drag-and-drop)
-# ------------------------
-uploaded_file = st.file_uploader("Upload Image", type=["png", "jpg", "jpeg"])
-
-# ------------------------
-# Threshold slider
-# ------------------------
-threshold = st.slider("Threshold for binarization", 50, 200, 127)
-
-# ------------------------
-# Skeletonization function
-# ------------------------
-def skeletonize(image_array, thresh_val):
-    # Convert to grayscale
-    gray = cv2.cvtColor(image_array, cv2.COLOR_BGR2GRAY)
-    # Binarize with threshold
-    _, binary = cv2.threshold(gray, thresh_val, 255, cv2.THRESH_BINARY_INV)
-    # Morphological thinning (real skeleton)
+# -------- Skeleton function --------
+def skeletonize(img):
+    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    _, binary = cv2.threshold(gray,127,255,cv2.THRESH_BINARY_INV)
     skeleton = cv2.ximgproc.thinning(binary)
-    # Invert back to normal colors
     skeleton = cv2.bitwise_not(skeleton)
-    # Colorize skeleton (red)
-    colored = cv2.cvtColor(skeleton, cv2.COLOR_GRAY2RGB)
-    colored[np.where((colored==[255,255,255]).all(axis=2))] = [255,0,0]  # red skeleton
-    return colored
+    return skeleton
 
-# ------------------------
-# Main app logic
-# ------------------------
+# -------- Upload image --------
+uploaded_file = st.file_uploader("Upload Image", type=["png","jpg","jpeg"])
+
+# -------- Drawing canvas --------
+st.subheader("Or draw something")
+
+canvas_result = st_canvas(
+    fill_color="rgba(255, 255, 255, 0)",
+    stroke_width=5,
+    stroke_color="black",
+    background_color="white",
+    height=300,
+    width=300,
+    drawing_mode="freedraw",
+    key="canvas",
+)
+
+# -------- Process uploaded image --------
 if uploaded_file:
     image = Image.open(uploaded_file).convert("RGB")
     img = np.array(image)
 
-    skeleton = skeletonize(img, threshold)
+    skeleton = skeletonize(img)
 
-    # Display side-by-side
     col1, col2 = st.columns(2)
     with col1:
-        st.subheader("Original Image")
-        st.image(img, use_column_width=True)
+        st.image(img, caption="Original")
     with col2:
-        st.subheader("Skeleton Image")
-        st.image(skeleton, use_column_width=True)
+        st.image(skeleton, caption="Skeleton")
 
-    # Download button
-    st.download_button(
-        "Download Skeleton Image",
-        data=cv2.imencode(".png", skeleton)[1].tobytes(),
-        file_name="skeleton.png",
-        mime="image/png"
-    )
+# -------- Process drawing --------
+elif canvas_result.image_data is not None:
+    img = canvas_result.image_data.astype(np.uint8)
+    img = cv2.cvtColor(img, cv2.COLOR_RGBA2BGR)
 
-else:
-    # Cloud-safe demo image
-    demo_path = Path(__file__).parent / "assets" / "demo.png"
-    with open(demo_path, "rb") as f:
-        demo_bytes = f.read()
-    st.image(demo_bytes, caption="Demo Preview")
+    skeleton = skeletonize(img)
+
+    col1, col2 = st.columns(2)
+    with col1:
+        st.image(img, caption="Drawing")
+    with col2:
+        st.image(skeleton, caption="Skeleton")
