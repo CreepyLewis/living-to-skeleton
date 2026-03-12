@@ -3,20 +3,27 @@ import cv2
 import numpy as np
 from PIL import Image
 
-# Page configuration
+# ------------------------
+# Page Configuration
+# ------------------------
 st.set_page_config(page_title="Living to Skeleton AI", page_icon="🦴", layout="wide")
 
-# Header
 st.title("🦴 Living to Skeleton AI")
-st.write("Upload an image to see its skeletonized version. Adjust threshold for best results!")
+st.write("Upload an image to see its skeletonized version. Adjust the threshold for best results!")
 
-# File uploader (drag-and-drop supported)
+# ------------------------
+# File uploader
+# ------------------------
 uploaded_file = st.file_uploader("Upload Image", type=["png","jpg","jpeg"])
 
-# Slider for binarization threshold
+# ------------------------
+# Threshold slider
+# ------------------------
 threshold = st.slider("Threshold for binarization", 50, 200, 127)
 
+# ------------------------
 # Skeletonization function
+# ------------------------
 def skeletonize(image_array, thresh_val):
     # Convert to grayscale
     gray = cv2.cvtColor(image_array, cv2.COLOR_BGR2GRAY)
@@ -26,19 +33,21 @@ def skeletonize(image_array, thresh_val):
     skeleton = cv2.ximgproc.thinning(binary)
     # Invert back to normal colors
     skeleton = cv2.bitwise_not(skeleton)
-    # Optional: colorize skeleton for fun
+    # Optional: colorize skeleton (red)
     colored = cv2.cvtColor(skeleton, cv2.COLOR_GRAY2RGB)
-    colored[np.where((colored==[255,255,255]).all(axis=2))] = [255,0,0] # red skeleton
+    colored[np.where((colored==[255,255,255]).all(axis=2))] = [255,0,0]  # red skeleton
     return colored
 
-# Main app logic
+# ------------------------
+# Main logic
+# ------------------------
 if uploaded_file:
-    image = Image.open(uploaded_file)
+    image = Image.open(uploaded_file).convert("RGB")
     img = np.array(image)
 
     skeleton = skeletonize(img, threshold)
 
-    # Side-by-side display
+    # Display side-by-side
     col1, col2 = st.columns(2)
     with col1:
         st.subheader("Original Image")
@@ -56,4 +65,5 @@ if uploaded_file:
     )
 
 else:
-    st.image("assets/demo.gif", caption="Demo Preview")
+    # Use static PNG demo preview instead of GIF
+    st.image("assets/demo.png", caption="Demo Preview")
