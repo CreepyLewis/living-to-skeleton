@@ -5,26 +5,16 @@ from PIL import Image
 import mediapipe as mp
 from ultralytics import YOLO
 
-# ------------------------
-# PAGE CONFIG
-# ------------------------
-
-st.set_page_config(
-    page_title="Living to Skeleton AI",
-    page_icon="🦴",
-    layout="wide"
-)
-
+st.set_page_config(page_title="Living to Skeleton AI", page_icon="🦴", layout="wide")
 st.title("🦴 Living to Skeleton AI")
 st.write("Upload an image and living things turn into skeletons!")
 
 # ------------------------
-# LOAD MODELS
+# Load models (cached)
 # ------------------------
-
 @st.cache_resource
 def load_models():
-    yolo = YOLO("yolov8n.pt")
+    yolo = YOLO("yolov8n.pt")  # YOLOv8 nano
     mp_pose = mp.solutions.pose.Pose()
     mp_draw = mp.solutions.drawing_utils
     return yolo, mp_pose, mp_draw
@@ -32,77 +22,44 @@ def load_models():
 yolo, pose, mp_draw = load_models()
 
 # ------------------------
-# HUMAN SKELETON
+# Human skeleton
 # ------------------------
-
 def draw_skeleton(img):
-
     rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
     results = pose.process(rgb)
-
     if results.pose_landmarks:
-        mp_draw.draw_landmarks(
-            img,
-            results.pose_landmarks,
-            mp.solutions.pose.POSE_CONNECTIONS
-        )
-        return img
-
+        mp_draw.draw_landmarks(img, results.pose_landmarks, mp.solutions.pose.POSE_CONNECTIONS)
     return img
 
-
 # ------------------------
-# DETECT LIVING THINGS
+# Detect living things
 # ------------------------
-
 def living_to_skeleton(img):
-
     results = yolo(img)[0]
-
-    living_classes = ["person", "dog", "cat", "horse", "cow", "sheep"]
-
+    living_classes = ["person","dog","cat","horse","cow","sheep"]
     for box in results.boxes:
-
         cls = int(box.cls[0])
         label = yolo.names[cls]
-
         if label in living_classes:
-
-            x1, y1, x2, y2 = map(int, box.xyxy[0])
-
+            x1,y1,x2,y2 = map(int, box.xyxy[0])
             roi = img[y1:y2, x1:x2]
-
             roi = draw_skeleton(roi)
-
             img[y1:y2, x1:x2] = roi
-
     return img
 
-
 # ------------------------
-# UPLOAD IMAGE
+# Upload Image
 # ------------------------
-
-st.header("📤 Upload Image")
-
-uploaded = st.file_uploader(
-    "Upload Image",
-    type=["png","jpg","jpeg"]
-)
-
+uploaded = st.file_uploader("Upload Image", type=["png","jpg","jpeg"])
 if uploaded:
-
     image = Image.open(uploaded).convert("RGB")
     img = np.array(image)
-
     result = living_to_skeleton(img.copy())
 
     col1, col2 = st.columns(2)
-
     with col1:
         st.subheader("Original")
         st.image(img)
-
     with col2:
         st.subheader("Skeleton Result")
         st.image(result)
