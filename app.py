@@ -2,19 +2,23 @@ import streamlit as st
 import cv2
 import numpy as np
 from PIL import Image
+from streamlit_drawable_canvas import st_canvas
 import mediapipe as mp
 from ultralytics import YOLO
 
+# ------------------------
+# Page config
+# ------------------------
 st.set_page_config(page_title="Living to Skeleton AI", page_icon="🦴", layout="wide")
 st.title("🦴 Living to Skeleton AI")
-st.write("Upload an image and living things turn into skeletons!")
+st.write("Upload an image, draw something, or take a photo to skeletonize living things only!")
 
 # ------------------------
 # Load models (cached)
 # ------------------------
 @st.cache_resource
 def load_models():
-    yolo = YOLO("yolov8n.pt")  # YOLOv8 nano
+    yolo = YOLO("yolov8n.pt")  # YOLOv8 nano model
     mp_pose = mp.solutions.pose.Pose()
     mp_draw = mp.solutions.drawing_utils
     return yolo, mp_pose, mp_draw
@@ -32,7 +36,7 @@ def draw_skeleton(img):
     return img
 
 # ------------------------
-# Detect living things
+# Detect living things and skeletonize
 # ------------------------
 def living_to_skeleton(img):
     results = yolo(img)[0]
@@ -50,6 +54,7 @@ def living_to_skeleton(img):
 # ------------------------
 # Upload Image
 # ------------------------
+st.header("📤 Upload Image")
 uploaded = st.file_uploader("Upload Image", type=["png","jpg","jpeg"])
 if uploaded:
     image = Image.open(uploaded).convert("RGB")
@@ -64,11 +69,10 @@ if uploaded:
         st.subheader("Skeleton Result")
         st.image(result)
 
-# -----------------------
-# Drawing Canvas Section
-# -----------------------
+# ------------------------
+# Draw Canvas
+# ------------------------
 st.header("✏️ Draw Something")
-
 canvas_result = st_canvas(
     stroke_width=5,
     stroke_color="black",
@@ -78,44 +82,33 @@ canvas_result = st_canvas(
     drawing_mode="freedraw",
     key="canvas",
 )
-
 if canvas_result.image_data is not None:
-
     img = canvas_result.image_data.astype(np.uint8)
     img = cv2.cvtColor(img, cv2.COLOR_RGBA2BGR)
-
-    skeleton = skeletonize(img)
+    result = living_to_skeleton(img.copy())
 
     col1, col2 = st.columns(2)
-
     with col1:
         st.subheader("Drawing")
         st.image(img)
-
     with col2:
         st.subheader("Skeleton")
-        st.image(skeleton)
+        st.image(result)
 
-
-# -----------------------
-# Webcam Section
-# -----------------------
+# ------------------------
+# Webcam Mode
+# ------------------------
 st.header("📷 Webcam Skeleton Mode")
-
 camera_image = st.camera_input("Take a picture")
-
 if camera_image:
     image = Image.open(camera_image).convert("RGB")
     img = np.array(image)
-
-    skeleton = skeletonize(img)
+    result = living_to_skeleton(img.copy())
 
     col1, col2 = st.columns(2)
-
     with col1:
         st.subheader("Camera Image")
         st.image(img)
-
     with col2:
         st.subheader("Skeleton")
-        st.image(skeleton)
+        st.image(result)
