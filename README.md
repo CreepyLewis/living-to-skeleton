@@ -9,3 +9,8 @@ pip install -r requirements.txt
 
 # 🎮 Run the application
 python main.py
+## 🖼 Demo
+
+| Input Image | Skeleton Output |
+|-------------|----------------|
+| ![Input](assets/input.png) | ![Output](assets/output.png) |
