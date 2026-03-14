@@ -2,6 +2,3 @@ streamlit
 opencv-python
 numpy
 pillow
-mediapipe
-ultralytics
-streamlit-drawable-canvas
