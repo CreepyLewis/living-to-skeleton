@@ -12,7 +12,7 @@ st.write(
     "Upload an image, video, or draw something. Humans/animals will be skeletonized in X-ray style."
 )
 
-# --- Skeleton/X-ray effect function ---
+# --- Skeleton/X-ray effect ---
 def skeleton_effect(img: np.ndarray) -> np.ndarray:
     gray = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
     blurred = cv2.GaussianBlur(gray, (5, 5), 0)
@@ -37,19 +37,32 @@ uploaded_file = st.file_uploader("Upload Image or Video", type=["png", "jpg", "j
 if uploaded_file:
     file_ext = uploaded_file.name.split(".")[-1].lower()
     
+    # ---------- IMAGE ----------
     if file_ext in ["png", "jpg", "jpeg"]:
         img = Image.open(uploaded_file).convert("RGB")
         img_np = np.array(img)
         skeleton_img = skeleton_effect(img_np)
         
+        # Preview side by side
         col1, col2 = st.columns(2)
         with col1:
             st.image(img, caption="Original Image", use_column_width=True)
         with col2:
             st.image(skeleton_img, caption="Skeleton/X-ray Image", use_column_width=True)
+        
+        # Save / download
+        save_path = tempfile.NamedTemporaryFile(delete=False, suffix=".png").name
+        Image.fromarray(skeleton_img).save(save_path)
+        st.download_button(
+            label="Download Skeletonized Image",
+            data=open(save_path, "rb").read(),
+            file_name="skeleton_image.png",
+            mime="image/png"
+        )
     
+    # ---------- VIDEO ----------
     elif file_ext == "mp4":
-        # Save uploaded video to temporary file
+        # Save uploaded video temporarily
         tfile = tempfile.NamedTemporaryFile(delete=False)
         tfile.write(uploaded_file.read())
         cap = cv2.VideoCapture(tfile.name)
@@ -76,6 +89,7 @@ if uploaded_file:
             sk_frame = skeleton_effect(frame_rgb)
             out.write(cv2.cvtColor(sk_frame, cv2.COLOR_RGB2BGR))
             
+            # Preview frame
             stframe.image(sk_frame, channels="RGB", use_column_width=True)
             
             frame_count += 1
@@ -83,7 +97,9 @@ if uploaded_file:
         
         cap.release()
         out.release()
+        
         st.success("Video processing complete!")
+        st.video(output_path)  # Preview full video
         st.download_button(
             label="Download Skeletonized Video",
             data=open(output_path, "rb").read(),
@@ -91,7 +107,7 @@ if uploaded_file:
             mime="video/mp4"
         )
 
-# --- Drawing canvas ---
+# ---------- DRAWING ----------
 st.write("---")
 st.write("Or draw something:")
 canvas_result = st_canvas(
@@ -109,3 +125,13 @@ if canvas_result.image_data is not None:
     drawn_img = cv2.cvtColor(canvas_result.image_data.astype(np.uint8), cv2.COLOR_RGBA2RGB)
     skeleton_drawn = skeleton_effect(drawn_img)
     st.image(skeleton_drawn, caption="Skeletonized Drawing", use_column_width=True)
+    
+    # Save / download
+    save_path = tempfile.NamedTemporaryFile(delete=False, suffix=".png").name
+    Image.fromarray(skeleton_drawn).save(save_path)
+    st.download_button(
+        label="Download Skeletonized Drawing",
+        data=open(save_path, "rb").read(),
+        file_name="skeleton_drawing.png",
+        mime="image/png"
+    )
