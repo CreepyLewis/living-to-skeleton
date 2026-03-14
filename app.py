@@ -4,12 +4,13 @@ import numpy as np
 from PIL import Image
 from streamlit_drawable_canvas import st_canvas
 import tempfile
-import mediapipe as mp
+from mediapipe.solutions.pose import Pose
+from mediapipe.solutions import drawing_utils as mp_drawing
 
 st.set_page_config(page_title="Living to Skeleton AI", page_icon="🦴")
-st.title("🦴 Living to Skeleton AI (Humans/Animals Only Skeleton)")
+st.title("🦴 Living to Skeleton AI (Humans Only Skeleton)")
 st.write(
-    "Upload an image, video, or draw something. Humans and animals will be skeletonized, keeping all non-living objects intact."
+    "Upload an image, video, or draw something. Humans will be skeletonized, keeping all non-living objects intact."
 )
 
 # --- Settings ---
@@ -21,9 +22,6 @@ def hex_to_rgb(hex_color):
     return tuple(int(hex_color[i:i+2], 16) for i in (0, 2, 4))
 
 glow_rgb = hex_to_rgb(glow_color)
-
-# --- MediaPipe Pose for humans ---
-mp_pose = mp.solutions.pose.Pose(static_image_mode=True, min_detection_confidence=0.5)
 
 # --- Skeleton Glow Function ---
 def skeleton_glow_effect(img: np.ndarray, color=(255, 255, 255), strength=0.6) -> np.ndarray:
@@ -48,7 +46,9 @@ def skeleton_glow_effect(img: np.ndarray, color=(255, 255, 255), strength=0.6) -
     result = cv2.addWeighted(result, 1.0, glow, strength, 0)
     return result
 
-# --- Mask humans ---
+# --- Mask humans with MediaPipe Pose ---
+mp_pose = Pose(static_image_mode=True, min_detection_confidence=0.5)
+
 def get_human_mask(img: np.ndarray) -> np.ndarray:
     img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
     results = mp_pose.process(img_rgb)
@@ -61,7 +61,6 @@ def get_human_mask(img: np.ndarray) -> np.ndarray:
         mask = cv2.dilate(mask, np.ones((25, 25), np.uint8), iterations=2)
     return mask
 
-# --- Apply skeleton only on humans ---
 def skeleton_humans_only(img: np.ndarray) -> np.ndarray:
     mask = get_human_mask(img)
     skeleton_img = skeleton_glow_effect(img, color=glow_rgb, strength=glow_strength)
