@@ -3,40 +3,46 @@ import cv2
 import numpy as np
 from PIL import Image
 from streamlit_drawable_canvas import st_canvas
-from mediapipe import solutions as mp_solutions
-
-# Mediapipe setup
-mp_pose = mp_solutions.pose
-mp_drawing = mp_solutions.drawing_utils
 
 st.set_page_config(page_title="Living to Skeleton AI", page_icon="🦴")
 st.title("🦴 Living to Skeleton AI")
-st.write("Upload an image or draw something. The app will skeletonize humans/animals and keep non-living parts unchanged.")
+st.write("Upload an image or draw something. The app will skeletonize living-like objects and keep non-living parts unchanged.")
 
-def skeletonize_living(img: np.ndarray) -> np.ndarray:
+# --- Skeletonization function ---
+def skeletonize_img(img: np.ndarray) -> np.ndarray:
     """
-    Detect humans/animals using Mediapipe and overlay skeleton lines.
-    Non-living parts remain unchanged.
+    Convert image to skeleton (thin lines) using OpenCV.
+    Preserves non-living background.
     """
-    img_rgb = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
-    img_copy = img.copy()
+    gray = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
+    _, binary = cv2.threshold(gray, 127, 255, cv2.THRESH_BINARY)
+    binary = cv2.bitwise_not(binary)
 
-    with mp_pose.Pose(static_image_mode=True, min_detection_confidence=0.5) as pose:
-        results = pose.process(img_rgb)
-        if results.pose_landmarks:
-            mp_drawing.draw_landmarks(img_copy, results.pose_landmarks, mp_pose.POSE_CONNECTIONS)
-    return img_copy
+    # Use OpenCV ximgproc thinning
+    try:
+        skeleton = cv2.ximgproc.thinning(binary)
+    except AttributeError:
+        # fallback if ximgproc unavailable: simple morphological skeleton
+        skeleton = cv2.morphologyEx(binary, cv2.MORPH_ERODE, np.ones((3,3), np.uint8))
+    
+    skeleton = cv2.bitwise_not(skeleton)
+    skeleton_rgb = cv2.cvtColor(skeleton, cv2.COLOR_GRAY2RGB)
 
-# --- IMAGE UPLOAD ---
+    # Overlay skeleton only where it exists
+    mask = skeleton_rgb > 0
+    result = img.copy()
+    result[mask] = skeleton_rgb[mask]
+    return result
+
+# --- Image upload ---
 uploaded_file = st.file_uploader("Upload Image", type=["png", "jpg", "jpeg"])
-
 col1, col2 = st.columns(2)
 
 if uploaded_file:
     img = Image.open(uploaded_file).convert("RGB")
     img_np = np.array(img)
 
-    skeleton_img = skeletonize_living(img_np)
+    skeleton_img = skeletonize_img(img_np)
 
     with col1:
         st.image(img, caption="Original Image", use_column_width=True)
@@ -46,7 +52,7 @@ if uploaded_file:
 st.write("---")
 st.write("Or draw something:")
 
-# --- DRAWING CANVAS ---
+# --- Drawing canvas ---
 canvas_result = st_canvas(
     fill_color="rgba(0, 0, 0, 0)",
     stroke_width=3,
@@ -60,5 +66,5 @@ canvas_result = st_canvas(
 
 if canvas_result.image_data is not None:
     drawn_img = cv2.cvtColor(canvas_result.image_data.astype(np.uint8), cv2.COLOR_RGBA2RGB)
-    skeleton_drawn = skeletonize_living(drawn_img)
+    skeleton_drawn = skeletonize_img(drawn_img)
     st.image(skeleton_drawn, caption="Skeletonized Drawing", use_column_width=True)
