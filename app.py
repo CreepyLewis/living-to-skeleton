@@ -3,17 +3,21 @@ import cv2
 import numpy as np
 from PIL import Image
 from streamlit_drawable_canvas import st_canvas
-import mediapipe as mp
+from mediapipe import solutions as mp_solutions
+
+# Mediapipe setup
+mp_pose = mp_solutions.pose
+mp_drawing = mp_solutions.drawing_utils
 
 st.set_page_config(page_title="Living to Skeleton AI", page_icon="🦴")
 st.title("🦴 Living to Skeleton AI")
 st.write("Upload an image or draw something. The app will skeletonize humans/animals and keep non-living parts unchanged.")
 
-mp_pose = mp.solutions.pose
-mp_drawing = mp.solutions.drawing_utils
-
-def skeletonize_living(img):
-    """Detect humans/animals and draw skeleton lines."""
+def skeletonize_living(img: np.ndarray) -> np.ndarray:
+    """
+    Detect humans/animals using Mediapipe and overlay skeleton lines.
+    Non-living parts remain unchanged.
+    """
     img_rgb = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
     img_copy = img.copy()
 
@@ -23,7 +27,7 @@ def skeletonize_living(img):
             mp_drawing.draw_landmarks(img_copy, results.pose_landmarks, mp_pose.POSE_CONNECTIONS)
     return img_copy
 
-# Upload or draw image
+# --- IMAGE UPLOAD ---
 uploaded_file = st.file_uploader("Upload Image", type=["png", "jpg", "jpeg"])
 
 col1, col2 = st.columns(2)
@@ -42,6 +46,7 @@ if uploaded_file:
 st.write("---")
 st.write("Or draw something:")
 
+# --- DRAWING CANVAS ---
 canvas_result = st_canvas(
     fill_color="rgba(0, 0, 0, 0)",
     stroke_width=3,
