@@ -1,7 +1,7 @@
 streamlit
-opencv-python-headless==4.10.0.84
+opencv-python-headless
+Pillow
 numpy
-pillow
 mediapipe
 ultralytics
 streamlit-drawable-canvas
