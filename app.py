@@ -6,13 +6,23 @@ from streamlit_drawable_canvas import st_canvas
 import tempfile
 
 st.set_page_config(page_title="Living to Skeleton AI", page_icon="🦴")
-st.title("🦴 Living to Skeleton AI (Glowing X-ray Skeleton)")
+st.title("🦴 Living to Skeleton AI (Custom Glowing X-ray Skeleton)")
 st.write(
-    "Upload an image, video, or draw something. Humans/animals will be skeletonized in glowing X-ray style."
+    "Upload an image, video, or draw something. Humans/animals will be skeletonized with a glowing X-ray style."
 )
 
-# --- Glowing skeleton effect ---
-def skeleton_glow_effect(img: np.ndarray) -> np.ndarray:
+# --- Select skeleton glow color ---
+glow_color = st.color_picker("Select Glow Color", "#ffffff")
+
+# Convert hex color to RGB tuple
+def hex_to_rgb(hex_color):
+    hex_color = hex_color.lstrip("#")
+    return tuple(int(hex_color[i:i+2], 16) for i in (0, 2, 4))
+
+glow_rgb = hex_to_rgb(glow_color)
+
+# --- Glowing skeleton effect with color ---
+def skeleton_glow_effect(img: np.ndarray, color=(255, 255, 255)) -> np.ndarray:
     gray = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
     blurred = cv2.GaussianBlur(gray, (5, 5), 0)
     
@@ -22,17 +32,20 @@ def skeleton_glow_effect(img: np.ndarray) -> np.ndarray:
     except AttributeError:
         skeleton = edges
     
-    # Make skeleton white
-    skeleton_rgb = cv2.cvtColor(skeleton, cv2.COLOR_GRAY2RGB)
-    skeleton_rgb[skeleton_rgb > 0] = 255
+    # Skeleton with chosen color
+    skeleton_rgb = np.zeros_like(img)
+    for i in range(3):
+        skeleton_rgb[:, :, i] = skeleton * (color[i] / 255)
     
-    # Create glow by blurring and adding multiple layers
+    skeleton_rgb = skeleton_rgb.astype(np.uint8)
+    
+    # Glow effect
     glow = cv2.GaussianBlur(skeleton_rgb, (15, 15), 0)
     result = np.zeros_like(img)
     mask = skeleton_rgb > 0
     result[mask] = skeleton_rgb[mask]
     
-    # Overlay glow with reduced intensity
+    # Overlay glow
     result = cv2.addWeighted(result, 1.0, glow, 0.6, 0)
     return result
 
@@ -46,7 +59,7 @@ if uploaded_file:
     if file_ext in ["png", "jpg", "jpeg"]:
         img = Image.open(uploaded_file).convert("RGB")
         img_np = np.array(img)
-        skeleton_img = skeleton_glow_effect(img_np)
+        skeleton_img = skeleton_glow_effect(img_np, glow_rgb)
         
         col1, col2 = st.columns(2)
         with col1:
@@ -87,7 +100,7 @@ if uploaded_file:
             if not ret:
                 break
             frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            sk_frame = skeleton_glow_effect(frame_rgb)
+            sk_frame = skeleton_glow_effect(frame_rgb, glow_rgb)
             out.write(cv2.cvtColor(sk_frame, cv2.COLOR_RGB2BGR))
             
             stframe.image(sk_frame, channels="RGB", use_column_width=True)
@@ -122,7 +135,7 @@ canvas_result = st_canvas(
 
 if canvas_result.image_data is not None:
     drawn_img = cv2.cvtColor(canvas_result.image_data.astype(np.uint8), cv2.COLOR_RGBA2RGB)
-    skeleton_drawn = skeleton_glow_effect(drawn_img)
+    skeleton_drawn = skeleton_glow_effect(drawn_img, glow_rgb)
     st.image(skeleton_drawn, caption="Glowing Skeleton Drawing", use_column_width=True)
     
     save_path = tempfile.NamedTemporaryFile(delete=False, suffix=".png").name
