@@ -14,9 +14,9 @@ st.write(
     "Upload an image, video, or draw something. All living things (humans, animals) will be skeletonized, keeping all non-living objects intact."
 )
 
-# --- Settings ---
+# Settings
 glow_color = st.color_picker("Select Glow Color", "#ffffff")
-glow_strength = st.slider("Glow Strength", min_value=0.0, max_value=1.0, value=0.6, step=0.05)
+glow_strength = st.slider("Glow Strength", 0.0, 1.0, 0.6, 0.05)
 
 def hex_to_rgb(hex_color):
     hex_color = hex_color.lstrip("#")
@@ -24,11 +24,12 @@ def hex_to_rgb(hex_color):
 
 glow_rgb = hex_to_rgb(glow_color)
 
-# --- Skeleton Glow Function ---
+# --- Skeleton Glow Effect ---
 def skeleton_glow_effect(img: np.ndarray, color=(255, 255, 255), strength=0.6) -> np.ndarray:
     gray = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
     blurred = cv2.GaussianBlur(gray, (5, 5), 0)
     edges = cv2.Canny(blurred, 50, 150)
+    # Use edges directly if thinning unavailable
     try:
         skeleton = cv2.ximgproc.thinning(edges)
     except AttributeError:
@@ -36,7 +37,6 @@ def skeleton_glow_effect(img: np.ndarray, color=(255, 255, 255), strength=0.6) -
     skeleton_rgb = np.zeros_like(img)
     for i in range(3):
         skeleton_rgb[:, :, i] = skeleton * (color[i] / 255)
-    skeleton_rgb = skeleton_rgb.astype(np.uint8)
     glow = cv2.GaussianBlur(skeleton_rgb, (15, 15), 0)
     result = np.zeros_like(img)
     mask = skeleton_rgb > 0
@@ -67,12 +67,11 @@ def get_animal_mask(img: np.ndarray) -> np.ndarray:
     results = model(img)
     for r in results:
         if hasattr(r, 'masks') and r.masks is not None:
-            for mask in r.masks.data:  # segmentation masks
+            for mask in r.masks.data:
                 animal_mask += (mask * 255).astype(np.uint8)
-    animal_mask = np.clip(animal_mask, 0, 255)
-    return animal_mask
+    return np.clip(animal_mask, 0, 255)
 
-# --- Combined Living Mask ---
+# --- Combined Mask ---
 def get_living_mask(img: np.ndarray) -> np.ndarray:
     human_mask = get_human_mask(img)
     animal_mask = get_animal_mask(img)
@@ -86,26 +85,24 @@ def skeleton_living_only(img: np.ndarray) -> np.ndarray:
     result[mask > 0] = skeleton_img[mask > 0]
     return result
 
-# --- Upload ---
+# --- Upload Image or Video ---
 uploaded_file = st.file_uploader("Upload Image or Video", type=["png","jpg","jpeg","mp4"])
 
 if uploaded_file:
     file_ext = uploaded_file.name.split(".")[-1].lower()
     
-    # ---------- IMAGE ----------
+    # IMAGE
     if file_ext in ["png","jpg","jpeg"]:
         img = np.array(Image.open(uploaded_file).convert("RGB"))
         skeleton_img = skeleton_living_only(img)
-        
         col1, col2 = st.columns(2)
         with col1: st.image(img, caption="Original Image", use_column_width=True)
         with col2: st.image(skeleton_img, caption="Skeleton Living Things", use_column_width=True)
-        
         save_path = tempfile.NamedTemporaryFile(delete=False, suffix=".png").name
         Image.fromarray(skeleton_img).save(save_path)
         st.download_button("Download Skeleton Image", open(save_path,"rb").read(), "skeleton_image.png", "image/png")
     
-    # ---------- VIDEO ----------
+    # VIDEO
     elif file_ext == "mp4":
         tfile = tempfile.NamedTemporaryFile(delete=False)
         tfile.write(uploaded_file.read())
@@ -129,11 +126,9 @@ if uploaded_file:
             if not ret: break
             sk_frame = skeleton_living_only(frame)
             out.write(cv2.cvtColor(sk_frame, cv2.COLOR_RGB2BGR))
-            
             if frame_count % preview_skip == 0:
                 preview_frame = cv2.resize(sk_frame,(preview_width,int(preview_width*height/width)))
                 stframe.image(preview_frame)
-            
             frame_count += 1
             progress_bar.progress(frame_count/total_frames)
         
@@ -143,7 +138,7 @@ if uploaded_file:
         st.video(output_path)
         st.download_button("Download Skeleton Video", open(output_path,"rb").read(), "skeleton_video.mp4", "video/mp4")
 
-# ---------- DRAWING ----------
+# DRAWING
 st.write("---")
 st.write("Or draw something:")
 canvas_result = st_canvas(
