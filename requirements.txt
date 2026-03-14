@@ -1,6 +1,6 @@
-streamlit
+mediapipe==1.13.0
 opencv-python-headless
+streamlit
 numpy
 pillow
 streamlit-drawable-canvas
-mediapipe
