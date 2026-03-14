@@ -1,4 +1,7 @@
 streamlit
-opencv-python
+opencv-python-headless
 numpy
 pillow
+mediapipe
+ultralytics
+streamlit-drawable-canvas
