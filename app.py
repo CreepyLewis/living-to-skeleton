@@ -4,12 +4,12 @@ import numpy as np
 from PIL import Image
 from streamlit_drawable_canvas import st_canvas
 import tempfile
-import mediapipe as mp
+from mediapipe import solutions as mp_solutions  # ✅ Correct import
 
 st.set_page_config(page_title="Living to Skeleton AI", page_icon="🦴")
-st.title("🦴 Living to Skeleton AI (Human/Animal Only + Glow Strength)")
+st.title("🦴 Living to Skeleton AI (Human Only + Glow Strength)")
 st.write(
-    "Upload an image, video, or draw something. Humans/animals will be skeletonized with a glowing X-ray style."
+    "Upload an image, video, or draw something. Humans will be skeletonized with a glowing X-ray style."
 )
 
 # --- Glow settings ---
@@ -42,8 +42,7 @@ def skeleton_glow_effect(img: np.ndarray, color=(255,255,255), strength=0.6):
     return result
 
 # --- MediaPipe Pose setup ---
-mp_pose = mp.solutions.pose
-pose = mp_pose.Pose(static_image_mode=True)
+pose = mp_solutions.pose.Pose(static_image_mode=True)
 
 def apply_skeleton_only_humans(img: np.ndarray, color=(255,255,255), strength=0.6):
     img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
