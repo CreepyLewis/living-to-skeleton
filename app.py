@@ -3,26 +3,25 @@ import cv2
 import numpy as np
 from PIL import Image
 from streamlit_drawable_canvas import st_canvas
-import mediapipe as mp
 import tempfile
-import os
+from mediapipe.python.solutions.pose import Pose
+from mediapipe.python.solutions.pose_connections import POSE_CONNECTIONS
 
 st.set_page_config(page_title="🦴 Living to Skeleton AI", layout="wide")
 st.title("🦴 Living to Skeleton AI")
 st.write("Upload an image, video, or draw something and convert humans/animals into glowing skeletons!")
 
 # -------------------------------
-# Sidebar: Controls
+# Sidebar Controls
 # -------------------------------
 st.sidebar.header("Skeleton Style Controls")
 glow_color = st.sidebar.color_picker("Glow Color", "#FF0000")
 glow_strength = st.sidebar.slider("Glow Strength", 1, 10, 5)
 
 # -------------------------------
-# Initialize MediaPipe
+# Initialize MediaPipe Pose
 # -------------------------------
-mp_pose = mp.solutions.pose
-pose = mp_pose.Pose(static_image_mode=True, min_detection_confidence=0.5)
+pose_detector = Pose(static_image_mode=True, min_detection_confidence=0.5)
 
 # -------------------------------
 # Helper Functions
@@ -30,18 +29,23 @@ pose = mp_pose.Pose(static_image_mode=True, min_detection_confidence=0.5)
 def draw_skeleton_on_frame(frame):
     """Detect human pose and draw glowing skeleton on frame"""
     img_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-    results = pose.process(img_rgb)
+    results = pose_detector.process(img_rgb)
     if results.pose_landmarks:
         h, w, _ = frame.shape
-        for connection in mp_pose.POSE_CONNECTIONS:
-            start_idx, end_idx = connection
+        for start_idx, end_idx in POSE_CONNECTIONS:
             start = results.pose_landmarks.landmark[start_idx]
             end = results.pose_landmarks.landmark[end_idx]
             x1, y1 = int(start.x * w), int(start.y * h)
             x2, y2 = int(end.x * w), int(end.y * h)
-            # Glow effect: draw multiple lines with transparency
+            # Glow effect: multiple lines for thickness
             for i in range(glow_strength):
-                cv2.line(frame, (x1, y1), (x2, y2), tuple(int(glow_color.lstrip("#")[j:j+2],16) for j in (0,2,4)), 1+i)
+                cv2.line(
+                    frame,
+                    (x1, y1),
+                    (x2, y2),
+                    tuple(int(glow_color.lstrip("#")[j:j+2],16) for j in (0,2,4)),
+                    1+i
+                )
     return frame
 
 def process_image(img):
@@ -49,9 +53,9 @@ def process_image(img):
     frame = draw_skeleton_on_frame(frame)
     return Image.fromarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
 
-def process_video(file):
+def process_video(file_path):
     """Process video file frame by frame"""
-    cap = cv2.VideoCapture(file)
+    cap = cv2.VideoCapture(file_path)
     fourcc = cv2.VideoWriter_fourcc(*'mp4v')
     temp_out = tempfile.NamedTemporaryFile(delete=False, suffix=".mp4")
     out = None
@@ -70,7 +74,7 @@ def process_video(file):
     return temp_out.name
 
 # -------------------------------
-# Main App: Upload Inputs
+# Main App: Tabs
 # -------------------------------
 tab1, tab2 = st.tabs(["Upload Image / Video", "Draw Something"])
 
