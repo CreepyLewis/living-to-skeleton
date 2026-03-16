@@ -4,3 +4,4 @@ numpy
 Pillow
 streamlit-drawable-canvas
 mediapipe
+moviepy==2.0.0
