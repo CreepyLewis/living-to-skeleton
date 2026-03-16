@@ -4,8 +4,7 @@ import numpy as np
 from PIL import Image
 from streamlit_drawable_canvas import st_canvas
 import tempfile
-from mediapipe.python.solutions.pose import Pose
-from mediapipe.python.solutions.pose_connections import POSE_CONNECTIONS
+from mediapipe.solutions.pose import Pose, POSE_CONNECTIONS
 
 st.set_page_config(page_title="🦴 Living to Skeleton AI", layout="wide")
 st.title("🦴 Living to Skeleton AI")
