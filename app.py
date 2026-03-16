@@ -4,10 +4,11 @@ import numpy as np
 from PIL import Image
 from streamlit_drawable_canvas import st_canvas
 import tempfile
+from moviepy.editor import VideoFileClip
 import time
 
 st.set_page_config(page_title="Living to Skeleton AI", page_icon="🦴")
-st.title("🦴 Living to Skeleton AI (Optimized + Glow Strength)")
+st.title("🦴 Living to Skeleton AI (Full Version)")
 st.write(
     "Upload an image, video, or draw something. Humans/animals will be skeletonized with a glowing X-ray style."
 )
@@ -83,8 +84,8 @@ if uploaded_file:
         fps = cap.get(cv2.CAP_PROP_FPS)
         fourcc = cv2.VideoWriter_fourcc(*"mp4v")
 
-        output_path = tempfile.NamedTemporaryFile(delete=False, suffix=".mp4").name
-        out = cv2.VideoWriter(output_path, fourcc, fps, (width, height))
+        temp_output_path = tempfile.NamedTemporaryFile(delete=False, suffix=".mp4").name
+        out = cv2.VideoWriter(temp_output_path, fourcc, fps, (width, height))
 
         stframe = st.empty()
         total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
@@ -112,12 +113,19 @@ if uploaded_file:
         cap.release()
         out.release()
 
+        # Merge original audio
+        input_clip = VideoFileClip(tfile.name)
+        skeleton_clip = VideoFileClip(temp_output_path)
+        final_output_path = tempfile.NamedTemporaryFile(delete=False, suffix=".mp4").name
+        final_clip = skeleton_clip.set_audio(input_clip.audio)
+        final_clip.write_videofile(final_output_path, codec="libx264", audio_codec="aac")
+
         st.success("Video processing complete!")
-        st.video(output_path)
+        st.video(final_output_path)
         st.download_button(
-            label="Download Glowing Skeleton Video",
-            data=open(output_path, "rb").read(),
-            file_name="glowing_skeleton_video.mp4",
+            label="Download Glowing Skeleton Video with Original Audio",
+            data=open(final_output_path, "rb").read(),
+            file_name="glowing_skeleton_video_audio.mp4",
             mime="video/mp4"
         )
 
