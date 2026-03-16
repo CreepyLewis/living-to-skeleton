@@ -4,23 +4,24 @@ import numpy as np
 from PIL import Image
 from streamlit_drawable_canvas import st_canvas
 import tempfile
-from mediapipe.solutions.pose import Pose, POSE_CONNECTIONS
+from mediapipe.solutions import pose as mp_pose  # fixed import
 
 st.set_page_config(page_title="🦴 Living to Skeleton AI", layout="wide")
 st.title("🦴 Living to Skeleton AI")
-st.write("Upload an image, video, or draw something and convert humans/animals into glowing skeletons!")
+st.write("Upload an image, video, or draw something and convert humans/animals into skeletons!")
 
 # -------------------------------
 # Sidebar Controls
 # -------------------------------
 st.sidebar.header("Skeleton Style Controls")
 glow_color = st.sidebar.color_picker("Glow Color", "#FF0000")
-glow_strength = st.sidebar.slider("Glow Strength", 1, 10, 5)
+glow_strength = st.sidebar.slider("Glow Strength", 1, 5)
 
 # -------------------------------
 # Initialize MediaPipe Pose
 # -------------------------------
-pose_detector = Pose(static_image_mode=True, min_detection_confidence=0.5)
+pose_detector = mp_pose.Pose(static_image_mode=True, min_detection_confidence=0.5)
+mp_connections = mp_pose.POSE_CONNECTIONS
 
 # -------------------------------
 # Helper Functions
@@ -31,7 +32,7 @@ def draw_skeleton_on_frame(frame):
     results = pose_detector.process(img_rgb)
     if results.pose_landmarks:
         h, w, _ = frame.shape
-        for start_idx, end_idx in POSE_CONNECTIONS:
+        for start_idx, end_idx in mp_connections:
             start = results.pose_landmarks.landmark[start_idx]
             end = results.pose_landmarks.landmark[end_idx]
             x1, y1 = int(start.x * w), int(start.y * h)
@@ -53,7 +54,6 @@ def process_image(img):
     return Image.fromarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
 
 def process_video(file_path):
-    """Process video file frame by frame"""
     cap = cv2.VideoCapture(file_path)
     fourcc = cv2.VideoWriter_fourcc(*'mp4v')
     temp_out = tempfile.NamedTemporaryFile(delete=False, suffix=".mp4")
@@ -73,22 +73,21 @@ def process_video(file_path):
     return temp_out.name
 
 # -------------------------------
-# Main App: Tabs
+# Main App Tabs
 # -------------------------------
 tab1, tab2 = st.tabs(["Upload Image / Video", "Draw Something"])
 
 with tab1:
     uploaded_file = st.file_uploader("Choose an image or video", type=["png","jpg","jpeg","mp4","mov"])
     if uploaded_file:
-        file_type = uploaded_file.type
-        if "image" in file_type:
+        if "image" in uploaded_file.type:
             img = Image.open(uploaded_file)
             output_img = process_image(img)
             st.image(output_img, caption="Skeleton Preview", use_column_width=True)
             with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as tmp_file:
                 output_img.save(tmp_file.name)
                 st.download_button("Download Image", tmp_file.name, file_name="skeleton.png")
-        elif "video" in file_type:
+        elif "video" in uploaded_file.type:
             st.info("Processing video... Please wait")
             temp_video_path = tempfile.NamedTemporaryFile(delete=False, suffix=".mp4").name
             with open(temp_video_path, "wb") as f:
