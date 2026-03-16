@@ -4,119 +4,135 @@ import numpy as np
 from PIL import Image
 from streamlit_drawable_canvas import st_canvas
 import tempfile
-import time
+import mediapipe as mp
 
 st.set_page_config(page_title="Living to Skeleton AI", page_icon="🦴")
-st.title("🦴 Living to Skeleton AI (Optimized + Glow Strength)")
+st.title("🦴 Living to Skeleton AI (Selective Skeletons)")
 st.write(
     "Upload an image, video, or draw something. Humans/animals will be skeletonized with a glowing X-ray style."
 )
 
-# --- Glow color picker ---
+# --- Glow color & strength ---
 glow_color = st.color_picker("Select Glow Color", "#ffffff")
+glow_strength = st.slider("Glow Strength", 0.0, 1.0, 0.6, 0.05)
+
 def hex_to_rgb(hex_color):
     hex_color = hex_color.lstrip("#")
     return tuple(int(hex_color[i:i+2], 16) for i in (0, 2, 4))
 glow_rgb = hex_to_rgb(glow_color)
 
-# --- Glow strength slider ---
-glow_strength = st.slider("Glow Strength", min_value=0.0, max_value=1.0, value=0.6, step=0.05)
+# --- Initialize MediaPipe Pose for humans ---
+mp_pose = mp.solutions.pose
+pose = mp_pose.Pose(static_image_mode=True, min_detection_confidence=0.5)
 
 # --- Skeleton glow effect ---
-def skeleton_glow_effect(img: np.ndarray, color=(255, 255, 255), strength=0.6) -> np.ndarray:
+def skeleton_glow_effect(img: np.ndarray, mask=None, color=(255,255,255), strength=0.6):
     gray = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
-    blurred = cv2.GaussianBlur(gray, (5, 5), 0)
-    
+    blurred = cv2.GaussianBlur(gray, (5,5), 0)
     edges = cv2.Canny(blurred, 50, 150)
     try:
         skeleton = cv2.ximgproc.thinning(edges)
     except AttributeError:
         skeleton = edges
-    
+
     skeleton_rgb = np.zeros_like(img)
     for i in range(3):
         skeleton_rgb[:, :, i] = skeleton * (color[i] / 255)
     skeleton_rgb = skeleton_rgb.astype(np.uint8)
-    
-    glow = cv2.GaussianBlur(skeleton_rgb, (15, 15), 0)
+    glow = cv2.GaussianBlur(skeleton_rgb, (15,15), 0)
     result = np.zeros_like(img)
-    mask = skeleton_rgb > 0
-    result[mask] = skeleton_rgb[mask]
-    result = cv2.addWeighted(result, 1.0, glow, strength, 0)
+
+    if mask is not None:
+        # Apply skeleton only where mask is True
+        mask_bool = mask.astype(bool)
+        result[mask_bool] = skeleton_rgb[mask_bool]
+        result = cv2.addWeighted(result,1.0, glow,strength,0)
+        result[~mask_bool] = img[~mask_bool]
+    else:
+        result = cv2.addWeighted(skeleton_rgb,1.0,glow,strength,0)
     return result
 
+# --- Detect humans in image (return mask) ---
+def detect_humans_mask(img_np):
+    img_rgb = cv2.cvtColor(img_np, cv2.COLOR_RGB2BGR)
+    results = pose.process(img_rgb)
+    mask = np.zeros(img_np.shape[:2], dtype=np.uint8)
+    if results.pose_landmarks:
+        # Draw a simple polygon around detected body points
+        points = [(int(lm.x*img_np.shape[1]), int(lm.y*img_np.shape[0])) for lm in results.pose_landmarks.landmark]
+        if points:
+            cv2.fillPoly(mask, [np.array(points, dtype=np.int32)], 1)
+    return mask.astype(bool)
+
 # --- Upload section ---
-uploaded_file = st.file_uploader("Upload Image or Video", type=["png", "jpg", "jpeg", "mp4"])
+uploaded_file = st.file_uploader("Upload Image or Video", type=["png","jpg","jpeg","mp4"])
 
 if uploaded_file:
     file_ext = uploaded_file.name.split(".")[-1].lower()
-    
+
     # ---------- IMAGE ----------
-    if file_ext in ["png", "jpg", "jpeg"]:
+    if file_ext in ["png","jpg","jpeg"]:
         img = Image.open(uploaded_file).convert("RGB")
         img_np = np.array(img)
-        skeleton_img = skeleton_glow_effect(img_np, glow_rgb, glow_strength)
-        
-        col1, col2 = st.columns(2)
+        mask = detect_humans_mask(img_np)
+        skeleton_img = skeleton_glow_effect(img_np, mask=mask, color=glow_rgb, strength=glow_strength)
+
+        col1,col2 = st.columns(2)
         with col1:
             st.image(img, caption="Original Image", use_column_width=True, channels="RGB")
         with col2:
             st.image(skeleton_img, caption="Glowing Skeleton", use_column_width=True, channels="RGB")
-        
+
         save_path = tempfile.NamedTemporaryFile(delete=False, suffix=".png").name
         Image.fromarray(skeleton_img).save(save_path)
         st.download_button(
-            label="Download Glowing Skeleton Image",
-            data=open(save_path, "rb").read(),
+            "Download Glowing Skeleton Image",
+            data=open(save_path,"rb").read(),
             file_name="glowing_skeleton_image.png",
             mime="image/png"
         )
-    
+
     # ---------- VIDEO ----------
-    elif file_ext == "mp4":
+    elif file_ext=="mp4":
         tfile = tempfile.NamedTemporaryFile(delete=False)
         tfile.write(uploaded_file.read())
         cap = cv2.VideoCapture(tfile.name)
-
         width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
         height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
         fps = cap.get(cv2.CAP_PROP_FPS)
         fourcc = cv2.VideoWriter_fourcc(*"mp4v")
-
         output_path = tempfile.NamedTemporaryFile(delete=False, suffix=".mp4").name
-        out = cv2.VideoWriter(output_path, fourcc, fps, (width, height))
+        out = cv2.VideoWriter(output_path, fourcc, fps, (width,height))
 
         stframe = st.empty()
         total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
         progress_bar = st.progress(0)
 
-        frame_count = 0
-        preview_skip = 3  # show 1 frame every 3 frames
-        preview_width = 400  # downscale preview frames
+        frame_count=0
+        preview_skip = 3
+        preview_width = 400
 
         while cap.isOpened():
             ret, frame = cap.read()
-            if not ret:
-                break
+            if not ret: break
             frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            sk_frame = skeleton_glow_effect(frame_rgb, glow_rgb, glow_strength)
+            mask = detect_humans_mask(frame_rgb)
+            sk_frame = skeleton_glow_effect(frame_rgb, mask=mask, color=glow_rgb, strength=glow_strength)
             out.write(cv2.cvtColor(sk_frame, cv2.COLOR_RGB2BGR))
 
-            if frame_count % preview_skip == 0:
-                preview_frame = cv2.resize(sk_frame, (preview_width, int(preview_width * height / width)))
+            if frame_count%preview_skip==0:
+                preview_frame = cv2.resize(sk_frame, (preview_width,int(preview_width*height/width)))
                 stframe.image(preview_frame, channels="RGB")
-            
             frame_count += 1
-            progress_bar.progress(frame_count / total_frames)
+            progress_bar.progress(frame_count/total_frames)
 
         cap.release()
         out.release()
-
         st.success("Video processing complete!")
         st.video(output_path)
         st.download_button(
-            label="Download Glowing Skeleton Video",
-            data=open(output_path, "rb").read(),
+            "Download Glowing Skeleton Video",
+            data=open(output_path,"rb").read(),
             file_name="glowing_skeleton_video.mp4",
             mime="video/mp4"
         )
@@ -139,12 +155,11 @@ if canvas_result.image_data is not None:
     drawn_img = cv2.cvtColor(canvas_result.image_data.astype(np.uint8), cv2.COLOR_RGBA2RGB)
     skeleton_drawn = skeleton_glow_effect(drawn_img, glow_rgb, glow_strength)
     st.image(skeleton_drawn, caption="Glowing Skeleton Drawing", use_column_width=True, channels="RGB")
-    
     save_path = tempfile.NamedTemporaryFile(delete=False, suffix=".png").name
     Image.fromarray(skeleton_drawn).save(save_path)
     st.download_button(
-        label="Download Glowing Skeleton Drawing",
-        data=open(save_path, "rb").read(),
+        "Download Glowing Skeleton Drawing",
+        data=open(save_path,"rb").read(),
         file_name="glowing_skeleton_drawing.png",
         mime="image/png"
     )
