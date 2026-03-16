@@ -1,7 +1,6 @@
-streamlit==1.26.0
-numpy==1.26.5
-opencv-python==4.8.1.78
-opencv-contrib-python==4.8.1.78
-Pillow==10.0.1
-streamlit-drawable-canvas==0.10.1
-moviepy==2.0.0
+streamlit>=1.24.1
+numpy>=1.25.0
+opencv-python>=4.8.0
+opencv-contrib-python>=4.8.0
+Pillow>=10.0.0
+streamlit-drawable-canvas>=0.10.0
