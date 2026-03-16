@@ -1,7 +1,7 @@
-streamlit
-opencv-contrib-python-headless
-numpy
-Pillow
-streamlit-drawable-canvas
-mediapipe
+streamlit==1.26.0
+numpy==1.26.5
+opencv-python==4.8.1.78
+opencv-contrib-python==4.8.1.78
+Pillow==10.0.1
+streamlit-drawable-canvas==0.10.1
 moviepy==2.0.0
